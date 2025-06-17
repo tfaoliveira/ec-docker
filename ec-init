@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+: "${ECD_DOCKERFILE_NAME:=Dockerfile}"
+: "${ECD_BUILD_CTX:=.}"
+: "${ECD_IMAGE_NAME:=ec-docker}"
+
+docker build --progress=plain -t "$ECD_IMAGE_NAME" -f "$ECD_DOCKERFILE_NAME" "$ECD_BUILD_CTX"

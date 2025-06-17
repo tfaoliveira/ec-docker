@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+
+: "${ECD_PROJECT_NAME:=ec-docker}"
+: "${ECD_IMAGE_NAME:=ec-docker}"
+: "${ECD_CONTAINER_NAME:=${ECD_IMAGE_NAME}-runner}"
+
+# first: check if image exists
+if docker image inspect "$ECD_IMAGE_NAME" &>/dev/null; then
+  echo "🟢 [$ECD_PROJECT_NAME] image '$ECD_IMAGE_NAME' exists."
+else
+  echo "🔴 [$ECD_PROJECT_NAME] image '$ECD_IMAGE_NAME' not found. To fix, run:"
+  echo "    $ ec-init"
+  echo "    $ ec-start"
+  exit 1;
+fi
+
+# second: check if container exists
+if docker container inspect "$ECD_CONTAINER_NAME" &>/dev/null; then
+
+  # third: check if container is running
+  if [ "$(docker inspect -f '{{.State.Running}}' "$ECD_CONTAINER_NAME")" = "true" ]; then
+    echo "🟢 [$ECD_PROJECT_NAME] container '$ECD_CONTAINER_NAME' is running."
+  else
+    echo "🔴 [$ECD_PROJECT_NAME] container '$ECD_CONTAINER_NAME' exists but is not running. To fix, run:"
+    echo "    $ ec-stop"
+    echo "    $ ec-start"
+  fi
+
+else
+  echo "🔴 [$ECD_PROJECT_NAME] container '$ECD_CONTAINER_NAME' does not exist. To fix, run:"
+  echo "    $ ec-start"
+fi

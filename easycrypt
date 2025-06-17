@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+
+: "${ECD_PROJECT_NAME:=ec-docker}"
+: "${ECD_IMAGE_NAME:=ec-docker}"
+: "${ECD_CONTAINER_NAME:=${ECD_IMAGE_NAME}-runner}"
+
+if ! docker inspect -f '{{.State.Running}}' "$ECD_CONTAINER_NAME" 2>/dev/null | grep -q true; then
+  echo "🔴 [$ECD_PROJECT_NAME] container '$ECD_CONTAINER_NAME' is not running. I will run 'ec-status' for you."
+  echo "   [$ECD_PROJECT_NAME] Running ec-status..."
+  $SDIR/ec-status
+  exit 1;
+fi
+
+docker exec -i -w "/easycrypt${CDIR#$PDIR}" "$ECD_CONTAINER_NAME" opam exec -- easycrypt "$@"
+
+

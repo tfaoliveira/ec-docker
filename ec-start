@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+: "${ECD_PROJECT_NAME:=ec-docker}"
+: "${ECD_IMAGE_NAME:=ec-docker}"
+: "${ECD_CONTAINER_NAME:=${ECD_IMAGE_NAME}-runner}"
+: "${ECD_MOUNT_PATH:=.}"
+
+if [ "$(docker inspect -f '{{.State.Running}}' $ECD_CONTAINER_NAME 2>/dev/null)" = "true" ]; then
+  echo "[$ECD_PROJECT_NAME] container '$ECD_CONTAINER_NAME' is already running."
+else
+  docker run -dit --name "$ECD_CONTAINER_NAME" -v "$ECD_MOUNT_PATH":/easycrypt "$ECD_IMAGE_NAME"
+fi

@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+
+: "${ECD_PROJECT_NAME:=ec-docker}"
+
+CDIR=$(pwd)
+
+# find .eco files
+FILES=$(find "$CDIR" -name "*.eco")
+
+if [[ -z "$FILES" ]]; then
+  echo "[$ECD_PROJECT_NAME] no .eco files found."
+else
+  echo "[$ECD_PROJECT_NAME] the following .eco files will be deleted:"
+  echo "$FILES"
+  
+  echo "$FILES" | xargs rm -f
+  echo "[$ECD_PROJECT_NAME] deletion complete."
+fi

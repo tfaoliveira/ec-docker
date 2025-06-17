@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+
+: "${ECD_PROJECT_NAME:=ec-docker}"
+: "${ECD_CONTAINER_NAME:=${ECD_IMAGE_NAME}-runner}"
+
+if docker inspect "$ECD_CONTAINER_NAME" &>/dev/null; then
+
+  if [ "$(docker inspect -f '{{.State.Running}}' "$ECD_CONTAINER_NAME")" = "true" ]; then
+    echo "[$ECD_PROJECT_NAME] stopping container '$ECD_CONTAINER_NAME'..."
+    docker stop "$ECD_CONTAINER_NAME"
+  else
+    echo "[$ECD_PROJECT_NAME] container '$ECD_CONTAINER_NAME' is not running."
+  fi
+
+  echo "[$ECD_PROJECT_NAME] removing container '$ECD_CONTAINER_NAME'..."
+  docker rm "$ECD_CONTAINER_NAME"
+
+else
+  echo "[$ECD_PROJECT_NAME] container '$ECD_CONTAINER_NAME' does not exist."
+fi
