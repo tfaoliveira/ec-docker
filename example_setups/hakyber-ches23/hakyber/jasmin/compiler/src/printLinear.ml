@@ -1,0 +1,112 @@
+open Utils
+open Linear
+open PrintCommon
+
+module W = Wsize
+module T = Type
+module E = Expr
+
+module P = Prog
+
+module F = Format
+
+(* ---------------------------------------------------------------- *)
+let pp_stype fmt =
+  function
+  | T.Coq_sbool  -> F.fprintf fmt "bool"
+  | T.Coq_sint   -> F.fprintf fmt "int"
+  | T.Coq_sarr n -> F.fprintf fmt "u%a[%a]" pp_wsize U8 Z.pp_print (Conv.z_of_pos n)
+  | T.Coq_sword sz -> F.fprintf fmt "u%a" pp_wsize sz
+
+(* ---------------------------------------------------------------- *)
+let rec pp_expr tbl fmt =
+  let pp_expr = pp_expr tbl in
+  function
+  | E.Pconst z -> Z.pp_print fmt (Conv.z_of_cz z)
+  | E.Pbool b -> pp_bool fmt b
+  | E.Parr_init n -> F.fprintf fmt "arr_init(%a)" Z.pp_print (Conv.z_of_pos n)
+  | E.Pvar x -> pp_var_i tbl fmt x.gv
+  | E.Pget (aa, ws, x, e) -> 
+    pp_arr_access (pp_var_i tbl) pp_expr pp_len fmt aa ws x.gv e None
+  | E.Psub (aa, ws, len, x, e) -> 
+    pp_arr_access (pp_var_i tbl) pp_expr pp_len fmt aa ws x.gv e
+      (Some (Conv.int_of_pos len))
+
+  | E.Pload (sz, x, e) -> F.fprintf fmt "(%a)[%a + %a]" pp_wsize sz (pp_var_i tbl) x pp_expr e
+  | E.Papp1 (op, e) -> F.fprintf fmt "(%s %a)" (string_of_op1 op) pp_expr e
+  | E.Papp2 (op, e1, e2) -> F.fprintf fmt "(%a %s %a)" pp_expr e1 (string_of_op2 op) pp_expr e2
+  | E.PappN (_op, _es) -> assert false
+  | E.Pif (_, c, e1, e2) -> F.fprintf fmt "(%a ? %a : %a)" pp_expr c pp_expr e1 pp_expr e2
+
+let pp_lval tbl fmt =
+  function
+  | E.Lnone (_, ty) -> F.fprintf fmt "(_: %a)" pp_stype ty
+  | E.Lvar x -> pp_var_i tbl fmt x
+  | E.Lmem (sz, x, e) -> F.fprintf fmt "(%a)[%a + %a]" pp_wsize sz (pp_var_i tbl) x (pp_expr tbl) e
+  | E.Laset (aa, ws, x, e) -> 
+    pp_arr_access (pp_var_i tbl) (pp_expr tbl) pp_len fmt aa ws x e None
+  | E.Lasub (aa, ws, len, x, e) -> 
+    pp_arr_access (pp_var_i tbl) (pp_expr tbl) pp_len fmt aa ws x e
+    (Some (Conv.int_of_pos len))
+
+
+let pp_label fmt lbl =
+  F.fprintf fmt "%a" Z.pp_print (Conv.z_of_pos lbl)
+
+let pp_remote_label tbl fmt (fn, lbl) =
+  F.fprintf fmt "%s.%a" (Conv.string_of_funname tbl fn) pp_label lbl
+
+let pp_instr asmOp tbl fmt i =
+  match i.li_i with
+  | Lopn (lvs, op, es) ->
+    let pp_cast fmt = function
+      | Sopn.Oasm (Arch_extra.BaseOp(Some ws, _)) -> Format.fprintf fmt "(%du)" (P.int_of_ws ws)
+      | _ -> () in
+
+    F.fprintf fmt "@[%a@] = %a%a@[(%a)@]"
+      (pp_list ",@ " (pp_lval tbl)) lvs
+      pp_cast op
+      (pp_opn asmOp) op
+      (pp_list ",@ " (pp_expr tbl)) es
+  | Lsyscall o -> F.fprintf fmt "SysCall %s" (pp_syscall o)
+  | Lcall lbl  -> F.fprintf fmt "Call %a" (pp_remote_label tbl) lbl
+  | Lret       -> F.fprintf fmt "Return"
+  | Lalign     -> F.fprintf fmt "Align"
+  | Llabel lbl -> F.fprintf fmt "Label %a" pp_label lbl
+  | Lgoto lbl -> F.fprintf fmt "Goto %a" (pp_remote_label tbl) lbl
+  | Ligoto e -> F.fprintf fmt "IGoto %a" (pp_expr tbl) e
+  | LstoreLabel (x, lbl) -> F.fprintf fmt "%a = Label %a" (pp_var tbl) x pp_label lbl
+  | Lcond (e, lbl) -> F.fprintf fmt "If %a goto %a" (pp_expr tbl) e pp_label lbl
+
+let pp_param tbl fmt x =
+  let y = Conv.var_of_cvar tbl x.E.v_var in
+  F.fprintf fmt "%a %a %s" pp_ty y.P.v_ty pp_kind y.P.v_kind y.P.v_name
+
+let pp_stackframe fmt (sz, ws) =
+  F.fprintf fmt "maximal stack usage: %a, alignment = %s"
+    Z.pp_print (Conv.z_of_cz sz) (P.string_of_ws ws)
+
+let pp_meta fmt fd =
+  F.fprintf fmt "(* %a *)"
+    pp_stackframe (fd.lfd_total_stack, fd.lfd_align)
+
+let pp_return tbl is_export fmt =
+  function
+  | [] -> if is_export then F.fprintf fmt "@ return"
+  | res -> F.fprintf fmt "@ return %a" (pp_list ",@ " (pp_var_i tbl)) res
+
+let pp_lfun asmOp tbl fmt (fn, fd) =
+  let name = Conv.fun_of_cfun tbl fn in
+  F.fprintf fmt "@[<v>%a@ fn %s @[(%a)@] -> @[(%a)@] {@   @[<v>%a%a@]@ }@]"
+    pp_meta fd
+    name.P.fn_name
+    (pp_list ",@ " (pp_param tbl)) fd.lfd_arg
+    (pp_list ",@ " pp_stype) fd.lfd_tyout
+    (pp_list ";@ " (pp_instr asmOp tbl)) fd.lfd_body
+    (pp_return tbl fd.lfd_export) fd.lfd_res
+
+let pp_prog asmOp tbl fmt lp =
+  F.fprintf fmt "@[<v>%a@ @ %a@]"
+    pp_datas lp.lp_globs
+    (pp_list "@ @ " (pp_lfun asmOp tbl)) (List.rev lp.lp_funcs)
+

@@ -19,7 +19,7 @@ if docker container inspect "$ECD_CONTAINER_NAME" &>/dev/null; then
 
   # third: check if container is running
   if [ "$(docker inspect -f '{{.State.Running}}' "$ECD_CONTAINER_NAME")" = "true" ]; then
-    echo "🟢 [$ECD_PROJECT_NAME] container '$ECD_CONTAINER_NAME' is running."
+    echo "🟢 [$ECD_PROJECT_NAME] container '$ECD_CONTAINER_NAME' is running (run ec-stop to stop it when needed)."
   else
     echo "🔴 [$ECD_PROJECT_NAME] container '$ECD_CONTAINER_NAME' exists but is not running. To fix, run:"
     echo "    $ ec-stop"
