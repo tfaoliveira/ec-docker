@@ -83,5 +83,5 @@ ec-stop
 ```
 ---
 
-**Have fun! **
+Have fun!
 
